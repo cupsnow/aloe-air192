@@ -1,0 +1,32 @@
+/* codegen by configure */
+#ifndef _H_SA7715_APPCFG
+#define _H_SA7715_APPCFG
+
+#define SA7715_DEVICE_NAME "Eve Play"
+
+#define SA7715_MANUFACTURER "Eve Systems"
+
+#define SA7715_MODEL "Eve Play 20EBR8701"
+
+#define SA7715_SERIAL_NUMBER "TV"
+
+#define SA7715_BUILD_NUMBER 70
+
+#define SA7715_VERSION_MAJOR 1
+
+#define SA7715_VERSION_MINOR 1
+
+#define SA7715_VERSION_RELEASE 42
+
+#define SA7715_VERSION "1.1.42"
+
+#define SA7715_HW_VERSION "1.0"
+
+#define SA7715_BOARD_TYPE 102
+
+#define SA7715_HAP_PRODUCT_DATA "2077577376af6313"
+
+#define SA7715_DOWNGRADABLE 0
+
+#endif /* _H_SA7715_APPCFG */
+    

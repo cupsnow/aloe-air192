@@ -1,0 +1,51 @@
+{
+  "name": "web2.2",
+  "version": "2.0.0",
+  "description": "fwupd",
+  "main": "fwupd.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "webpack": "webpack",
+    "start": "webpack serve",
+    "watch": "webpack --watch"
+  },
+  "comment1": {
+    "repository": {
+      "type": "git",
+      "url": "git+https://github.com/cupsnow/web2.2.git"
+    }
+  },
+  "author": "joelai",
+  "comment2": {
+    "license": "MIT",
+    "bugs": {
+      "url": "https://github.com/cupsnow/web2.2/issues"
+    },
+    "homepage": "https://cupsnow.github.io/web2.2/"
+  },
+  "devDependencies": {
+    "@babel/core": "*",
+    "@babel/node": "*",
+    "@babel/plugin-proposal-class-properties": "*",
+    "@babel/preset-env": "*",
+    "@babel/preset-react": "*",
+    "babel-loader": "*",
+    "css-loader": "*",
+    "ejs-loader": "*",
+    "html-webpack-plugin": "*",
+    "node-sass": "*",
+    "path": "*",
+    "sass-loader": "*",
+    "style-loader": "*",
+    "terser-webpack-plugin": "*",
+    "url-loader": "*",
+    "webpack": "*",
+    "webpack-cli": "*",
+    "webpack-dev-server": "*",
+    "webpack-merge": "*"
+  },
+  "dependencies": {
+    "react": "*",
+    "react-dom": "*"
+  }
+}
