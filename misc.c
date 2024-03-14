@@ -1391,3 +1391,78 @@ void aloe_sem_destroy(aloe_sem_t *ctx) {
 	pthread_cond_destroy(&ctx->not_empty);
 	pthread_mutex_destroy(&ctx->mutex);
 }
+
+void* aloe_mmapfile(int fd, void **vm, size_t *offset, size_t *len) {
+	size_t _offset = 0, _len = 0;
+	long pgz = 0, pga = 0;
+	void *_vm = (void*)MAP_FAILED;
+	int r;
+	struct stat fst;
+
+	// given all or none
+	if ((vm || offset || len) && !(vm && offset && len)) {
+		r = EINVAL;
+		log_e("%s\n", strerror(r));
+		goto finally;
+	}
+
+	if ((pgz = sysconf(_SC_PAGE_SIZE)) == -1l) {
+		r = errno;
+		log_e("Failed get page size, %s\n", strerror(r));
+		goto finally;
+	}
+
+	if (pgz == 0) {
+		r = EIO;
+		log_e("Sanity check page size 0\n");
+		goto finally;
+	}
+
+	if ((r = fstat(fd, &fst)) != 0) {
+		r = errno;
+		log_e("Failed file stat, %s\n", strerror(r));
+		goto finally;
+	}
+
+	if (vm) {
+		_offset = *offset;
+		_len = *len;
+	}
+
+	if (_offset >= (size_t)fst.st_size) {
+		r = EIO;
+		log_e("Failed offset after file size\n");
+		goto finally;
+	}
+
+	if (_len == 0) _len = fst.st_size;
+	if (_offset + _len > (size_t)fst.st_size) _len = fst.st_size - _offset;
+	if (_offset && (pga = _offset % pgz) > 0) {
+		log_d("page size %zd, offset %zd -> %zd\n", (size_t)pgz, (size_t)_offset,
+				_offset - (size_t)pga);
+		_offset -= pga;
+		_len += pga;
+	} else {
+		pga = 0;
+	}
+
+	if ((_vm = mmap(NULL, _len, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
+			_offset)) == (void*)MAP_FAILED) {
+		r = errno;
+		log_e("Failed mmap %s\n", strerror(r));
+		_vm = NULL;
+		goto finally;
+	}
+
+	if (vm) {
+		*offset = _offset;
+		*len = _len;
+		*vm = _vm;
+	}
+
+	if (pga > 0) {
+		_vm = (char*)_vm + pga;
+	}
+finally:
+	return _vm;
+}

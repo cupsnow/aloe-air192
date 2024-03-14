@@ -28,7 +28,6 @@
 #include <linux/perf_event.h>
 #include <pthread.h>
 #include <getopt.h>
-#include <sys/mman.h>
 
 #if defined(TEST_AIR192) && TEST_AIR192
 #include <admin/air192.h>
@@ -285,17 +284,20 @@ finally: __attribute__((unused));
 
 DECL_TEST(test1_wpacli1) {
 	void *wpa = NULL;
+	std::unique_ptr<char[]> _buf(new char[5000]);
+	aloe_buf_t buf = {.data = _buf.get(), .cap = 5000};
+	cJSON *jarr = NULL;
+	int r;
+#if !defined(USER_PREFIX)
 	const char *wpaPath = "/var/run/wpa_supplicant";
 	const char *ifce = "wlan0";
 	const char *ctrlPath = "/var/run/wificfg-ctrl";
-	std::unique_ptr<char[]> _buf(new char[5000]);
-	aloe_buf_t buf = {.data = _buf.get(), .cap = 5000}, buf2;
-	cJSON *jarr = NULL;
-	int r;
+	aloe_buf_t buf2;
 	struct {
 		unsigned wpasup: 1;
 		unsigned wpasup_retain: 1;
 	} start_flag = { };
+#endif
 
 #if defined(USER_PREFIX)
 	ALOE_TEST_ASSERT_THEN((r = aloe_file_fread("wpacli1.log", aloe_buf_clear(&buf))) > 0 &&
@@ -854,7 +856,19 @@ DECL_TEST(test1_str1) {
 				(unsigned)(unsigned long)&result_ssid,
 				(unsigned)(unsigned long)result_ssid);
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat"
+/*
+warning: format ‘%[^
+   ’ expects argument of type ‘char*’, but argument 3 has type ‘char (*)[512]’ [-Wformat=]
+  860 |             sscanf(msg, "%32[^\n]", &result_ssid);
+      |                          ~~~~~^~    ~~~~~~~~~~~~
+      |                               |     |
+      |                               char* char (*)[512]
+ */
 	    sscanf(msg, "%32[^\n]", &result_ssid);
+#pragma GCC diagnostic pop
+
 	    log_d("result_ssid: %s\n", result_ssid);
 
 	    sscanf(msg, "%32[^\n]", result_ssid);
@@ -1131,97 +1145,20 @@ finally:
 	return r;
 }
 
-extern "C"
-void* aloe_mmapfile(int fd, void **vm, size_t *offset, size_t *len) {
-	size_t _offset = 0, _len = 0;
-	long pgz = 0, pga = 0;
-	void *_vm = (void*)MAP_FAILED;
-	int r;
-	struct stat fst;
 
-	// given all or none
-	if ((vm || offset || len) && !(vm && offset && len)) {
-		r = EINVAL;
-		log_e("%s\n", strerror(r));
-		goto finally;
-	}
-
-	if ((pgz = sysconf(_SC_PAGE_SIZE)) == -1l) {
-		r = errno;
-		log_e("Failed get page size, %s\n", strerror(r));
-		goto finally;
-	}
-
-	if (pgz == 0) {
-		r = EIO;
-		log_e("Sanity check page size 0\n");
-		goto finally;
-	}
-
-	if ((r = fstat(fd, &fst)) != 0) {
-		r = errno;
-		log_e("Failed file stat, %s\n", strerror(r));
-		goto finally;
-	}
-
-	if (vm) {
-		_offset = *offset;
-		_len = *len;
-	}
-
-	if (_offset >= (size_t)fst.st_size) {
-		r = EIO;
-		log_e("Failed offset after file size\n");
-		goto finally;
-	}
-
-	if (_len == 0) _len = fst.st_size;
-	if (_offset + _len > (size_t)fst.st_size) _len = fst.st_size - _offset;
-	if (_offset && (pga = _offset % pgz) > 0) {
-		log_d("page size %zd, offset %zd -> %zd\n", (size_t)pgz, (size_t)_offset,
-				_offset - (size_t)pga);
-		_offset -= pga;
-		_len += pga;
-	} else {
-		pga = 0;
-	}
-
-	if ((_vm = mmap(NULL, _len, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
-			_offset)) == (void*)MAP_FAILED) {
-		r = errno;
-		log_e("Failed mmap %s\n", strerror(r));
-		_vm = NULL;
-		goto finally;
-	}
-
-	if (vm) {
-		*offset = _offset;
-		*len = _len;
-		*vm = _vm;
-	}
-
-	if (pga > 0) {
-		_vm = (char*)_vm + pga;
-	}
-finally:
-	return _vm;
-}
-
-DECL_TEST(test1_cfgstr1) {
+DECL_TEST(test1_ftrim1) {
 #define gc_fd(_fd) if (_fd != -1) { close(_fd); (_fd) = -1; }
+
 	int r, fd = -1;
-	const char* if_name = "eth0";
 	const char *cfg = NULL;
-	air192_ipsetup_t ipsetup;
-	char cmd[0xff];
 	aloe_buf_t fb = {}, mm = {};
 	size_t cap = 400 * 1048576;
 	struct stat fst;
 	void *mm_addr = NULL;
 
-	if (aloe_buf_expand(&fb, cap * 2, aloe_buf_flag_none) != 0) {
+	if (!(fb.data = malloc(fb.cap = cap * 2))) {
 		r = ENOMEM;
-		log_e("alloc 400MB\n");
+		log_e("alloc %zdMB\n", cap * 2 / 1048576);
 		goto finally;
 	}
 
@@ -1312,6 +1249,28 @@ DECL_TEST(test1_cfgstr1) {
 	}
 	log_d("compare done\n");
 	gc_fd(fd);
+finally:
+	if (fb.data) free(fb.data);
+	if (mm_addr && (munmap(mm_addr, mm.cap)) != 0) {
+		int eno = errno;
+		log_e("Failed munmap %s\n", strerror(eno));
+	}
+	gc_fd(fd);
+	if (r != 0) {
+		test_case->flag_result = aloe_test_flag_result_failed_suite;
+	} else {
+		test_case->flag_result = aloe_test_flag_result_pass;
+	}
+	return test_case->flag_result;
+#undef gc_fd
+}
+
+DECL_TEST(test1_cfgstr1) {
+	int r;
+	const char* if_name = "eth0";
+	const char *cfg = NULL;
+	air192_ipsetup_t ipsetup;
+	char cmd[100];
 
 	if (cfg == NULL) {
 		if (strncasecmp(if_name, "eth", strlen("eth")) == 0) {
@@ -1376,19 +1335,12 @@ DECL_TEST(test1_cfgstr1) {
 	}
 
 finally:
-	if (fb.data) free(fb.data);
-	if (mm_addr && (munmap(mm_addr, mm.cap)) != 0) {
-		int eno = errno;
-		log_e("Failed munmap %s\n", strerror(eno));
-	}
-	gc_fd(fd);
 	if (r != 0) {
 		test_case->flag_result = aloe_test_flag_result_failed_suite;
 	} else {
 		test_case->flag_result = aloe_test_flag_result_pass;
 	}
 	return test_case->flag_result;
-#undef gc_fd
 }
 
 static int test_reporter(unsigned lvl, const char *tag, long lno,
@@ -1473,6 +1425,7 @@ int main(int argc, char **argv) {
 //	ALOE_TEST_CASE_INIT4(&test_base, "Test1/str1", &test1_str1);
 //	ALOE_TEST_CASE_INIT4(&test_base, "Test1/swres1", &test1_swres1);
 	ALOE_TEST_CASE_INIT4(&test_base, "Test1/str1", &test1_cfgstr1);
+//	ALOE_TEST_CASE_INIT4(&test_base, "Test1/ftrim1", &test1_ftrim1);
 
 	ALOE_TEST_RUN(&test_base);
 

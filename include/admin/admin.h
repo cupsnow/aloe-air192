@@ -53,6 +53,7 @@
 #include <arpa/inet.h>
 
 #include <sys/un.h>
+#include <sys/mman.h>
 
 #include <time.h>
 #include <pthread.h>
@@ -591,6 +592,7 @@ void aloe_sem_post(aloe_sem_t *ctx, char broadcast);
 int aloe_sem_wait(aloe_sem_t *ctx, unsigned long dur_ms);
 void aloe_sem_destroy(aloe_sem_t *ctx);
 
+void* aloe_mmapfile(int fd, void **vm, size_t *offset, size_t *len);
 
 #ifdef __cplusplus
 } // extern "C"
